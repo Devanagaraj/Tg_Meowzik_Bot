@@ -1,5 +1,5 @@
 from __future__ import unicode_literals 
-import mpv, os, asyncio, json, requests
+import os, asyncio, json, requests
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
 from config import owner_id, bot_token, sudo_chat_id
