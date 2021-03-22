@@ -1,8 +1,8 @@
 # TG Meowzik Bot
 
-Telegram Voice-Chat Bot To Play Music From Various Sources In Your Group
-Uses MPV Player for Playing! with Queue supported.
-
+- Telegram Voice-Chat Bot To Play Music From Various Sources In Your Group.
+- Uses MPV Player for Playing! with Queue supported.
+- Enjoy 320Kbps Meowzik with Telegram x64 Radio Mode.
 
 # Support
 
