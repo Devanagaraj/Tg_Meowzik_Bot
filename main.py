@@ -1,8 +1,8 @@
 from __future__ import unicode_literals 
-import mpv, os, asyncio, json, requests, youtube_dl
+import mpv, os, asyncio, json, requests
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
-from config import owner_id, bot_token, radio_link, sudo_chat_id
+from config import owner_id, bot_token, sudo_chat_id
 from youtube_search import YoutubeSearch
 
 #Initialize---------------------------------
