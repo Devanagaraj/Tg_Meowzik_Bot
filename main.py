@@ -91,6 +91,9 @@ async def play():
             InlineKeyboardButton(f"Skip", callback_data="skip_"), 
             InlineKeyboardButton(f"Queue", callback_data="queue_")
             ]] ))
+        if queue[0][5]=="Telegram":
+            await app.download_media(queue[0][0], file_name="audio.webm")
+            queue[0][0]= "downloads/audio.webm --no-video"
         s = await asyncio.create_subprocess_shell(
         f"mpv {queue[0][0]} --profile=low-latency --no-video",
         stdout=asyncio.subprocess.PIPE,
@@ -352,23 +355,24 @@ async def telegram(_, message: Message):
     query = kwairi(message)
     if not message.from_user.id:
         return
-    elif not message.reply_to_message:
+    elif not message.reply_to_message.media:
         await message.reply_text("Reply To A Telegram Audio To Play It.")
         return
     elif message.reply_to_message.audio:
         if int(message.reply_to_message.audio.file_size) >= 104857600:
             await message.reply_text('Bruh! Only songs within 100 MB')
             return
+        else:
+            slink= message.reply_to_message.audio.file_id
     elif message.reply_to_message.document:
         if int(message.reply_to_message.document.file_size) >= 104857600:
             await message.reply_text('Bruh! Only songs within 100 MB')
             return
+        else:
+            slink= message.reply_to_message.document.file_id
     current_player = message.from_user.id
-    m = await message.reply_text(f"Downloading....")
-    await app.download_media(message.reply_to_message, file_name="audio.webm")
-    await m.edit(f"Added `{message.reply_to_message.link}` to playlist")
+    m = await message.reply_text(f"Added `{message.reply_to_message.link}` to playlist")
     module="Telegram"
-    slink= "downloads/audio.webm --no-video"
     sname= ''
     sduration= ''
     sname=''
@@ -389,6 +393,7 @@ async def telegram(_, message: Message):
 #KILL
 @app.on_message(filters.user(owner_id) & filters.command(["kill"]) & filters.chat(sudo_chat_id) & ~filters.edited)
 async def quit(_, message: Message):
+    await message.reply_text("aww snap >-< , GoodByeCruelWorld")
     queue=[]
     print("Exiting...........")
     os.system(f"{kill} mpv")
