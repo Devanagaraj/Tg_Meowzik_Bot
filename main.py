@@ -240,6 +240,7 @@ async def deezer(_, message: Message):
         await m.edit("Aww...got some error! Try Again")
         await asyncio.sleep(5)
         await m.delete()
+        await message.delete()
         return
     await m.delete()
     await message.delete()
