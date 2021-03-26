@@ -5,7 +5,7 @@ from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
 from config import owner_id, bot_token, sudo_chat_id
 from youtube_search import YoutubeSearch
 
-#Initialize---------------------------------
+#Initialize--------------------------
 app = Client(
     ":memory:",
     bot_token=bot_token,
@@ -17,14 +17,14 @@ queue=[]
 playing=False
 current_player=None
 
-# Os Determination---------------------------
+# Os Determination-------------------
 
 if os.name == "nt":
     kill = "tskill"
 else:
     kill = "killall -9"
 
-# Get User Input-----------------------------
+# Get User Input---------------------
 def kwairi(message):
     query = ""
     for i in message.command[1:]:
@@ -55,10 +55,9 @@ async def getadmins(chat_id):
     async for i in app.iter_chat_members(chat_id, filter="administrators"):
         admins.append(i.user.id)
     admins.append(owner_id)
-    admins.append(queue[0][7])
     return admins
 
-#Help------------------------------------------------------------------------  
+#Help  ------------------------------------------------------------------------------------
 @app.on_message(
     filters.command(["help"]) & filters.chat(sudo_chat_id) & ~filters.edited
 )
@@ -77,8 +76,18 @@ async def help(_, message: Message):
 /kill Yeah it kills the bot LOL
 /clearqueue It clears entire Queue in a snap"""
     )
-    
-#PLAY-------------------------------------------------------------------------
+
+#Repo  ------------------------------------------------------------------------------------
+@app.on_message(
+    filters.command(["repo"]) & filters.chat(sudo_chat_id) & ~filters.edited
+)
+async def repo(_, message: Message):
+    m= await message.reply_text(text="""[Meowzik Repo](https://github.com/Devanagaraj/Tg_Meowzik_Bot) | [Support Group](https://t.me/TGVCSUPPORT)""", disable_web_page_preview=True)
+    await asyncio.sleep(10)
+    await m.delete()
+    await message.delete()
+
+#PLAY-------------------------------------------------------------------------------------------------------------
 async def play():
     global queue
     global playing
@@ -107,15 +116,14 @@ async def play():
         if len(queue)<=1:
             playing=False
         del queue[0]
-        
-#SKIP---------------------------------------------------------------------------------------      
-
+#SKIP---------------------------------------------------------------------------------------------------------------
 @app.on_message(filters.command(["skip"]) & filters.chat(sudo_chat_id) & ~filters.edited)
 async def skip(_, message: Message):
     global queue
     global mm
     global s
     list_of_admins = await getadmins(message.chat.id)
+    list_of_admins.append(queue[0][7])
     if message.from_user.id not in list_of_admins:
         a= await app.send_message(sudo_chat_id,text=f"Skipping songs without admin permission is Sin! \n Want a Good Ban {message.from_user.mention}?")
         await asyncio.sleep(5)
@@ -162,7 +170,7 @@ async def callback_query_skip(_, message: Message):
     await asyncio.sleep(5)
     await m.delete()
  
-#QUEUE----------------------------------------------------------------------------------------
+#QUEUE-----------------------------------------------------------------------------------------------------------
 
 @app.on_message(filters.command(["queue"]) & filters.chat(sudo_chat_id) & ~filters.edited)
 async def q(_, message: Message):
@@ -174,25 +182,53 @@ async def q(_, message: Message):
         await message.delete()
         return
     liste= listy(queue)
-    q= await message.reply_text(liste)
-    await asyncio.sleep(10)
-    await q.delete()
-    await message.delete
+    if len(liste) > 4096:
+        filename = "Queue.txt"
+        with open(filename, "w+", encoding="utf8") as out_file:
+            out_file.write(liste)
+        q= await message.reply_document(
+            document=filename,
+            caption="Queue List",
+            disable_notification=True,
+        )
+        os.remove(filename)
+        await asyncio.sleep(10)
+        await q.delete()
+        await message.delete
+    else:
+        q= await message.reply_text(liste)
+        await asyncio.sleep(10)
+        await q.delete()
+        await message.delete
     
 @app.on_callback_query(filters.regex("queue_"))
 async def callback_query_queue(_, message):
     global queue
     if len(queue)<=1:
-        q= await app.send_message(sudo_chat_id,text= "Queue is empty!")
+        q= await app.send_message(sudo_chat_id,text= f"Queue is empty! \nClicked by {message.from_user.mention}")
         await asyncio.sleep(5)
         await q.delete()
         return
     liste= listy(queue)
-    q= await app.send_message(sudo_chat_id,text= liste)
-    await asyncio.sleep(10)
-    await q.delete()
+    if len(liste) > 4096:
+        filename = "Queue.txt"
+        with open(filename, "w+", encoding="utf8") as out_file:
+            out_file.write(liste)
+        q= await app.send_document(sudo_chat_id,
+            document=filename,
+            caption=f"Queue List \n Clicked by {message.from_user.mention}",
+            disable_notification=True,
+        )
+        os.remove(filename)
+        await asyncio.sleep(10)
+        await q.delete()
+    else:
+        q= await app.send_message(sudo_chat_id,text= f"{liste} \nClicked by {message.from_user.mention}")
+        await asyncio.sleep(10)
+        await q.delete()
     
-#CLEAR QUEUE
+#CLEAR QUEUE----------------------------------------------------------------------------------------------------------------------
+
 @app.on_message(filters.user(owner_id) & filters.command(["clearqueue"]) & filters.chat(sudo_chat_id) & ~filters.edited)
 async def q(_, message: Message):
        global queue
@@ -341,6 +377,59 @@ async def jiosaavn(_, message: Message):
         playing=True
         await play()
         
+
+# Jiosaavn Playlist--------------------------------------------------------------------------------------
+
+@app.on_message(
+    filters.command(["playlist"])
+    & filters.chat(sudo_chat_id)
+    & ~filters.edited
+)
+async def playlist(_,message: Message):
+    global queue
+    global playing
+    global m
+    if not message.from_user.id:
+        return
+    current_player = message.from_user.id
+    list_of_admins = await getadmins(sudo_chat_id)
+    if message.from_user.id not in list_of_admins:
+        a= await app.send_message(sudo_chat_id,text=f"Why don't you get an AdminTag? to use playlist {message.from_user.mention}...")
+        await asyncio.sleep(5)
+        await a.delete()
+        await message.delete()
+        return
+    query = kwairi(message)
+    m = await message.reply_text("Searching for Playlist and trying to get songs....")
+    try:
+        resp= requests.get(f"https://thearq.tech/splaylist?query={query}").json()
+        for i in resp:
+            sname = i['song']
+            slink = i['media_url']
+            slink = slink.replace('500x500','200x200')
+            singers = i['singers']
+            sthumb = i['image']
+            sduration = convert_seconds(int(i['duration']))
+            module="JioSaavn Playlist"
+            q= [slink,sduration,message.from_user.first_name,sname,singers,module,sthumb,current_player]
+            queue.append(q)
+        await m.edit(f"Added {len(resp)} songs from Playlist link")
+        await asyncio.sleep(5)
+        await m.delete()
+    except Exception as e:
+        print(e)
+        await m.edit("Use Jiosaavn playlist link only! or check logs for other errors")
+        await asyncio.sleep(5)
+        await m.delete()
+        await message.delete()
+        return
+    await message.delete()
+    if playing:
+        return
+    else:
+        playing=True
+        await play()
+
 # Telegram--------------------------------------------------------------------------------------
 
 @app.on_message(
@@ -391,7 +480,7 @@ async def telegram(_, message: Message):
         await play()
         
         
-#KILL
+#KILL--------------------------------------------------------------
 @app.on_message(filters.user(owner_id) & filters.command(["kill"]) & filters.chat(sudo_chat_id) & ~filters.edited)
 async def quit(_, message: Message):
     await message.reply_text("aww snap >-< , GoodByeCruelWorld")
@@ -400,5 +489,4 @@ async def quit(_, message: Message):
     os.system(f"{kill} mpv")
     exit()
    
-
 app.run()
