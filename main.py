@@ -68,6 +68,7 @@ async def help(_, message: Message):
 /skip To Skip Any Playing Music.
 /queue To See Queue List.
 /saavn "Song_Name" To Play A Song From Jiosaavn.
+/playlist "saavn_playlist_link" To add all songs to Queue and Play.
 /youtube "Song_Name" To Search For A Song And Play The Top-Most Song Or Play With A Link.
 /deezer "Song_Name" To Play A Song From Deezer.
 /telegram While Tagging a Song To Play From Telegram File.
