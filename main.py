@@ -1,422 +1,145 @@
-from __future__ import unicode_literals 
-import os, asyncio, json, requests
-from pyrogram import Client, filters
-from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
-from config import owner_id, bot_token, sudo_chat_id
-from youtube_search import YoutubeSearch
+import wget,asyncio,os,requests,json,shutil
+from pyrogram import filters, types, Client
+from pyrogram.types import Message,InlineKeyboardMarkup,InlineKeyboardButton,InputMediaAudio
+from motor.motor_asyncio import AsyncIOMotorClient as MongoClient
+from moviepy.editor import AudioFileClip
+from mutagen.easyid3 import EasyID3
 
-#Initialize--------------------------
 app = Client(
     ":memory:",
-    bot_token=bot_token,
+    bot_token= "1690303219:AAGlzjJdVDYCKL6Yr-v-1dYq-49mHfjzBPo" ,
     api_id=6,
     api_hash="eb06d4abfb49dc3eeb1aeb98ae0f581e",
 )
 
-queue=[]
-playing=False
-current_player=None
+songs=[]
 
-# Os Determination-------------------
+async def dl(message,num,n,allsongs):
+        global songs
+        link= allsongs[num]['media_url']
+        file= wget.download(link)
+        file_mp4=link.split('/')[-1]
+        mp4_file = os.getcwd()+f"/{file_mp4}"
+        mp3_file = os.getcwd()+f"/{file_mp4.split('.')[0]}.mp3"
+        ffile = AudioFileClip(mp4_file)
+        ffile.write_audiofile(mp3_file,bitrate='320k')
+        audio = EasyID3(mp3_file)
+        audio['title'] = allsongs[num]['song']
+        audio['artist'] = allsongs[num]['singers']
+        audio['album'] = allsongs[num]['album']
+        audio.save()
+        os.rename(mp3_file,f"{os.getcwd()}/{allsongs[num]['song']}.mp3")
+        await app.send_audio(chat_id= message.message.chat.id, 
+        audio=f"./{allsongs[num]['song']}.mp3", title=allsongs[num]['song'], performer=allsongs[num]['singers'], caption=f"**{allsongs[num]['song']}** \n Requested by {message.from_user.mention}",disable_notification=True)
+        await n.delete()
+        os.remove(mp4_file)
+        os.remove(f"{os.getcwd()}/{allsongs[num]['song']}.mp3")
+        curr_user=None
+        songs=[] 
 
-if os.name == "nt":
-    kill = "tskill"
-else:
-    kill = "killall -9"
 
-# Get User Input---------------------
-def kwairi(message):
-    query = ""
-    for i in message.command[1:]:
-        query += f"{i} "
-    return query
-
-def convert_seconds(seconds):
-    seconds = seconds % (24 * 3600)
-    seconds %= 3600
-    minutes = seconds // 60
-    seconds %= 60
-    return "%02d:%02d" % (minutes, seconds)
-
-def time_to_seconds(time):
-    stringt = str(time)
-    return sum(int(x) * 60 ** i for i, x in enumerate(reversed(stringt.split(':'))))
-    
-def listy(queue):
-    liste=""
-    for i,qq in enumerate(queue):
-        if i==0:
-            continue
-        liste = liste+ f"{i}.**Song:**`{qq[3]}` Via {qq[5]}- Requested by {qq[2]}\n"
-    return liste
-
-async def getadmins(chat_id):
-    admins = []
-    async for i in app.iter_chat_members(chat_id, filter="administrators"):
-        admins.append(i.user.id)
-    admins.append(owner_id)
-    return admins
-
-#Help  ------------------------------------------------------------------------------------
-@app.on_message(
-    filters.command(["help"]) & filters.chat(sudo_chat_id) & ~filters.edited
-)
-async def help(_, message: Message):
-    await message.reply_text(
-        """**Currently These Commands Are Supported.**
-/help To Show This Message.
-/skip To Skip Any Playing Music.
-/queue To See Queue List.
-/saavn "Song_Name" To Play A Song From Jiosaavn.
-/playlist "saavn_playlist_link" To add all songs to Queue and Play.
-/youtube "Song_Name" To Search For A Song And Play The Top-Most Song Or Play With A Link.
-/deezer "Song_Name" To Play A Song From Deezer.
-/telegram While Tagging a Song To Play From Telegram File.
-
-**Admin Commands**:
-/kill Yeah it kills the bot LOL
-/clearqueue It clears entire Queue in a snap"""
-    )
-
-#Repo  ------------------------------------------------------------------------------------
-@app.on_message(
-    filters.command(["repo"]) & filters.chat(sudo_chat_id) & ~filters.edited
-)
-async def repo(_, message: Message):
-    m= await message.reply_text(text="""[Meowzik Repo](https://github.com/Devanagaraj/Tg_Meowzik_Bot) | [Support Group](https://t.me/TGVCSUPPORT)""", disable_web_page_preview=True)
-    await asyncio.sleep(10)
-    await m.delete()
-    await message.delete()
-
-#PLAY-------------------------------------------------------------------------------------------------------------
-async def play():
-    global queue
-    global playing
-    global mm
-    global s
-    while len(queue)>0:
-        mm = await app.send_photo(sudo_chat_id,photo=f"{queue[0][6]}",
-            caption=f"Now Playing `{queue[0][3]}`  by `{queue[0][4]}` Via {queue[0][5]}\nRequested by {queue[0][2]}",
-            reply_markup=InlineKeyboardMarkup( [[ 
-            InlineKeyboardButton(f"Skip", callback_data="skip_"), 
-            InlineKeyboardButton(f"Queue", callback_data="queue_")
-            ]] ))
-        if queue[0][5]=="Telegram":
-            await app.download_media(queue[0][0], file_name="audio.webm")
-            queue[0][0]= "downloads/audio.webm --no-video"
-        s = await asyncio.create_subprocess_shell(
-        f"mpv {queue[0][0]} --profile=low-latency --no-video",
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,)
-        await s.wait()
-        await mm.delete()
-        try:
-            os.system(f"{kill} mpv")
-        except:
-            pass
-        if len(queue)<=1:
-            playing=False
-        del queue[0]
-#SKIP---------------------------------------------------------------------------------------------------------------
-@app.on_message(filters.command(["skip"]) & filters.chat(sudo_chat_id) & ~filters.edited)
-async def skip(_, message: Message):
-    global queue
-    global mm
-    global s
-    list_of_admins = await getadmins(message.chat.id)
-    list_of_admins.append(queue[0][7])
-    if message.from_user.id not in list_of_admins:
-        a= await app.send_message(sudo_chat_id,text=f"Skipping songs without admin permission is Sin! \n Want a Good Ban {message.from_user.mention}?")
+@app.on_message((filters.command("song") | filters.command("saavn")) & filters.group & ~filters.edited)
+async def saavn(_,message:Message):
+    global songs
+    global m
+    if len(songs)!=0:
+        k= await message.reply_text("Hey wait while processing old request")
         await asyncio.sleep(5)
-        await a.delete()
-        await message.delete()
+        await k.delete()
         return
-    if len(queue)<=1:
-        m= await message.reply_text("Can't skip an empty queue!")
+    search = message.text.split(None, 1)[1]
+    if len(search)<2:
+        m= await message.reply_text("Hey you need atleast 2 letters for searching")
         await asyncio.sleep(5)
         await m.delete()
-        await message.delete()
         return
-    await mm.delete()
     try:
-        os.system(f"{kill} mpv")
+        a= requests.get(f"https://jiosaavnapi.bhadoo.uk/result/?query={search}").text
+        songs=json.loads(a)
+    except:
+        a= requests.get(f"https://thearq.tech/saavn?query={search}").text
+    button=[]
+    for i,lis in enumerate(songs):
+        a=[InlineKeyboardButton(f"{str(i+1)}. {lis['song']} from {lis['album']} by {lis['singers']}", callback_data= f"{str(i+1)}")]
+        button.append(a)
+    button.append([InlineKeyboardButton(f"Cancel", callback_data= f"kancel")])
+    m= await message.reply_text(
+        text='**Choose a song to Download or Click cancel:**',
+        reply_markup=InlineKeyboardMarkup(button),disable_notification=True)
+    await asyncio.sleep(60)
+    try:
+        await m.delete()
     except:
         pass
-    m= await message.reply_text("Skipped!")
-    await asyncio.sleep(5)
-    await m.delete()
-    await message.delete()
+    curr_user = message.from_user.id
     
-@app.on_callback_query(filters.regex("skip_"))
-async def callback_query_skip(_, message: Message):
-    global queue
-    global mm
-    list_of_admins = await getadmins(sudo_chat_id)
-    if message.from_user.id not in list_of_admins:
-        a= await app.send_message(sudo_chat_id,text=f"Skipping songs without admin permission is Sin! \n Want a Good Ban {message.from_user.mention}?")
-        await asyncio.sleep(5)
-        await a.delete()
-        return
-    elif len(queue)<=1:
-        m= await app.send_message(sudo_chat_id,text="Can't skip an empty queue!")
-        await asyncio.sleep(5)
-        await m.delete()
-        return
-    await mm.delete()
-    try:
-        os.system(f"{kill} mpv")
-    except:
-        pass
-    m= await app.send_message(sudo_chat_id,text="Skipped!")
-    await asyncio.sleep(5)
+@app.on_callback_query(filters.regex("1"))
+async def callback_query_next(_, message: Message):
+    global m
+    global songs
     await m.delete()
- 
-#QUEUE-----------------------------------------------------------------------------------------------------------
-
-@app.on_message(filters.command(["queue"]) & filters.chat(sudo_chat_id) & ~filters.edited)
-async def q(_, message: Message):
-    global queue
-    if len(queue)<=1:
-        q= await message.reply_text("Queue is empty!")
-        await asyncio.sleep(5)
-        await q.delete()
-        await message.delete()
-        return
-    liste= listy(queue)
-    if len(liste) > 4096:
-        filename = "Queue.txt"
-        with open(filename, "w+", encoding="utf8") as out_file:
-            out_file.write(liste)
-        q= await message.reply_document(
-            document=filename,
-            caption="Queue List",
-            disable_notification=True,
-        )
-        os.remove(filename)
-        await asyncio.sleep(10)
-        await q.delete()
-        await message.delete
-    else:
-        q= await message.reply_text(liste)
-        await asyncio.sleep(10)
-        await q.delete()
-        await message.delete
+    await message.message.reply_to_message.delete()
+    n= await app.send_message(message.message.chat.id,text=f"Processing and Uploading {songs[0]['song']} Requested by {message.from_user.mention}",disable_notification=True)
+    await dl(message,0,n,songs)
     
-@app.on_callback_query(filters.regex("queue_"))
-async def callback_query_queue(_, message):
-    global queue
-    if len(queue)<=1:
-        q= await app.send_message(sudo_chat_id,text= f"Queue is empty! \nClicked by {message.from_user.mention}")
-        await asyncio.sleep(5)
-        await q.delete()
-        return
-    liste= listy(queue)
-    if len(liste) > 4096:
-        filename = "Queue.txt"
-        with open(filename, "w+", encoding="utf8") as out_file:
-            out_file.write(liste)
-        q= await app.send_document(sudo_chat_id,
-            document=filename,
-            caption=f"Queue List \n Clicked by {message.from_user.mention}",
-            disable_notification=True,
-        )
-        os.remove(filename)
-        await asyncio.sleep(10)
-        await q.delete()
-    else:
-        q= await app.send_message(sudo_chat_id,text= f"{liste} \nClicked by {message.from_user.mention}")
-        await asyncio.sleep(10)
-        await q.delete()
+@app.on_callback_query(filters.regex("2"))
+async def callback_query_next(_, message: Message):
+    global m
+    global songs
+    await m.delete()
+    await message.message.reply_to_message.delete()
+    n= await app.send_message(message.message.chat.id,text=f"Processing and Uploading {songs[1]['song']} Requested by {message.from_user.mention}",disable_notification=True)
+    await dl(message,1,n,songs)
+
+@app.on_callback_query(filters.regex("3"))
+async def callback_query_next(_, message: Message):
+    global m
+    global songs
+    await m.delete()
+    await message.message.reply_to_message.delete()
+    n= await app.send_message(message.message.chat.id,text=f"Processing and Uploading {songs[2]['song']} Requested by {message.from_user.mention}",disable_notification=True)
+    await dl(message,2,n,songs)
+
+@app.on_callback_query(filters.regex("4"))
+async def callback_query_next(_, message: Message):
+    global m
+    global songs
+    await m.delete()
+    await message.message.reply_to_message.delete()
+    n= await app.send_message(message.message.chat.id,text=f"Processing and Uploading {songs[3]['song']} Requested by {message.from_user.mention}",disable_notification=True)
+    await dl(message,3,n,songs)
+
+@app.on_callback_query(filters.regex("5"))
+async def callback_query_next(_, message: Message):
+    global m
+    global songs
+    await m.delete()
+    await message.message.reply_to_message.delete()
+    n= await app.send_message(message.message.chat.id,text=f"Processing and Uploading {songs[4]['song']} Requested by {message.from_user.mention}",disable_notification=True)
+    await dl(message,4,n,songs)
     
-#CLEAR QUEUE----------------------------------------------------------------------------------------------------------------------
-
-@app.on_message(filters.user(owner_id) & filters.command(["clearqueue"]) & filters.chat(sudo_chat_id) & ~filters.edited)
-async def q(_, message: Message):
-       global queue
-       global playing
-       global mm
-       queue=[]
-       q= await message.reply_text("Queue cleared successfully")
-       await asyncio.sleep(3)
-       await q.delete()
-       await mm.delete()
-       try:
-        os.system(f"{kill} mpv")
-       except:
-        pass
-       playing=False
-       await message.delete()
-       
-# Deezer----------------------------------------------------------------------------------------
-
-@app.on_message(
-    filters.command(["deezer"])
-    & filters.chat(sudo_chat_id)
-    & ~filters.edited
-)
-async def deezer(_, message: Message):
-    global blacks
-    global playing
-    global queue
+@app.on_callback_query(filters.regex("kancel"))
+async def callback_query_next(_, message: Message):
     global m
-    query = kwairi(message)
-    if not message.from_user.id:
-        return
-    current_player = message.from_user.id
-    m = await message.reply_text(f"Searching for `{query}`on Deezer")
-    try:
-        resp= requests.get(f"https://thearq.tech/deezer?query={query}&count=1").text
-        r = json.loads(resp)
-        sname = r[0]["title"]
-        sduration = (r[0]["duration"])
-        thumbnail = r[0]["thumbnail"]
-        singers = r[0]["artist"]
-        slink = r[0]["url"]
-        module="Deezer"
-    except:
-        await m.edit("Aww...got some error! Try Again")
-        await asyncio.sleep(5)
-        await m.delete()
-        await message.delete()
-        return
+    global songs
+    songs=[]
     await m.delete()
-    await message.delete()
-    q= [slink,sduration,message.from_user.first_name,sname,singers,module,thumbnail,current_player]
-    queue.append(q)
-    if playing:
-        return
-    else:
-        playing=True
-        await play()
-
-# Youtube---------------------------------------------------------------------------------------
-@app.on_message(filters.command(["youtube"]) & filters.chat(sudo_chat_id) & ~filters.edited)
-async def yt(_, message: Message):
-    global blacks
-    global playing
-    global queue
-    global m
-    query = kwairi(message)
-    if not message.from_user.id:
-        return
-    current_player = message.from_user.id
-    m = await message.reply_text(f"Searching for `{query}`on YouTube")
-    try:
-        results = YoutubeSearch(query, max_results=1).to_dict()
-        slink= f"https://youtube.com{results[0]['url_suffix']}"
-        title = results[0]["title"]
-        singers = results[0]["channel"]
-        thumbnail = results[0]["thumbnails"][0]
-        sduration = results[0]["duration"]
-        duration= time_to_seconds(sduration)
-        views = results[0]["views"]
-        module = "YouTube"
-        if int(duration)>=1800: #duration limit
-                await m.edit("Bruh! Only songs within 30 Mins")
-                return    
-    except Exception as e:
-        await m.edit("can't find anything!")
-        await asyncio.sleep(3)
-        await m.delete()
-        await message.delete()
-        print(str(e))
-        return
-    await m.delete()
-    await message.delete()
-    q= [slink,sduration,message.from_user.first_name,title,singers,module,thumbnail,current_player]
-    queue.append(q)
-    if playing:
-        return
-    else:
-        playing=True
-        await play()
+    await message.message.reply_to_message.delete()
     
-# Jiosaavn--------------------------------------------------------------------------------------
-
-@app.on_message(
-    filters.command(["saavn"])
-    & filters.chat(sudo_chat_id)
-    & ~filters.edited
-)
-async def jiosaavn(_, message: Message):
-    global blacks
-    global playing
-    global queue
-    global m
-    query = kwairi(message)
-    if not message.from_user.id:
-        return
-    current_player = message.from_user.id
-    m = await message.reply_text(f"Searching for `{query}`on JioSaavn")
-    try:
-        try:
-           resp= requests.get(f"https://jiosaavnapi.bhadoo.uk/result/?query={query}").text
-           r = json.loads(resp)
-        except:
-            resp= requests.get(f"https://thearq.tech/saavn?{query}=blah&count=1").text
-            r = json.loads(resp)
-        sname = r[0]['song']
-        slink = r[0]['media_url']
-        slink = slink.replace('500x500','200x200')
-        singers = r[0]['singers']
-        sthumb = r[0]['image']
-        sduration = convert_seconds(int(r[0]['duration']))
-        module="JioSaavn"
-    except Exception as e:
-        print(e)
-        await m.edit("Aww...got some error! Try Again")
+#playlist---------------------------------------------------------------------------------------
+@app.on_message(filters.command("plist") & filters.group & ~filters.edited)
+async def playlist(_,message):
+    global songs
+    if len(songs)!=0:
+        m= await message.reply_text("Hey wait while processing old request")
         await asyncio.sleep(5)
         await m.delete()
         return
-    await m.delete()
-    await message.delete()
-    q= [slink,sduration,message.from_user.first_name,sname,singers,module,sthumb,current_player]
-    queue.append(q)
-    if playing:
-        return
-    else:
-        playing=True
-        await play()
-        
-
-# Jiosaavn Playlist--------------------------------------------------------------------------------------
-
-@app.on_message(
-    filters.command(["playlist"])
-    & filters.chat(sudo_chat_id)
-    & ~filters.edited
-)
-async def playlist(_,message: Message):
-    global queue
-    global playing
-    global m
-    if not message.from_user.id:
-        return
-    current_player = message.from_user.id
-    list_of_admins = await getadmins(sudo_chat_id)
-    if message.from_user.id not in list_of_admins:
-        a= await app.send_message(sudo_chat_id,text=f"Why don't you get an AdminTag? to use playlist {message.from_user.mention}...")
-        await asyncio.sleep(5)
-        await a.delete()
-        await message.delete()
-        return
-    query = kwairi(message)
-    m = await message.reply_text("Searching for Playlist and trying to get songs....")
+    query = message.text.split(None, 1)[1]
+    m= await message.reply_text(f"searching for {query}")
     try:
-        resp= requests.get(f"https://thearq.tech/splaylist?query={query}").json()
-        for i in resp:
-            sname = i['song']
-            slink = i['media_url']
-            slink = slink.replace('500x500','200x200')
-            singers = i['singers']
-            sthumb = i['image']
-            sduration = convert_seconds(int(i['duration']))
-            module="JioSaavn Playlist"
-            q= [slink,sduration,message.from_user.first_name,sname,singers,module,sthumb,current_player]
-            queue.append(q)
-        await m.edit(f"Added {len(resp)} songs from Playlist link")
-        await asyncio.sleep(5)
-        await m.delete()
+        Asongs= requests.get(f"https://thearq.tech/splaylist?query={query}").json()
+        listname= query.split('/')[-2]
     except Exception as e:
         print(e)
         await m.edit("Use Jiosaavn playlist link only! or check logs for other errors")
@@ -424,70 +147,32 @@ async def playlist(_,message: Message):
         await m.delete()
         await message.delete()
         return
-    await message.delete()
-    if playing:
-        return
-    else:
-        playing=True
-        await play()
-
-# Telegram--------------------------------------------------------------------------------------
-
-@app.on_message(
-    filters.command(["telegram"])
-    & filters.chat(sudo_chat_id)
-    & ~filters.edited
-)
-async def telegram(_, message: Message):
-    global blacks
-    global queue
-    global playing
-    global m
-    query = kwairi(message)
-    if not message.from_user.id:
-        return
-    elif not message.reply_to_message.media:
-        await message.reply_text("Reply To A Telegram Audio To Play It.")
-        return
-    elif message.reply_to_message.audio:
-        if int(message.reply_to_message.audio.file_size) >= 104857600:
-            await message.reply_text('Bruh! Only songs within 100 MB')
-            return
-        else:
-            slink= message.reply_to_message.audio.file_id
-    elif message.reply_to_message.document:
-        if int(message.reply_to_message.document.file_size) >= 104857600:
-            await message.reply_text('Bruh! Only songs within 100 MB')
-            return
-        else:
-            slink= message.reply_to_message.document.file_id
-    current_player = message.from_user.id
-    m = await message.reply_text(f"Added `{message.reply_to_message.link}` to playlist")
-    module="Telegram"
-    sname= ''
-    sduration= ''
-    sname=''
-    singers=''
-    sthumb="tg.png"
+    await m.edit(f"found {len(Asongs)} , Downloading all")
+    try:
+        os.mkdir(listname)
+    except:
+        pass
+    album_path= os.getcwd()+f"/{listname}/"
+    for i,j in enumerate(Asongs):
+        try:
+            await m.edit(f"{i+1} of {len(Asongs)} - Downloading "+f"{Asongs[i]['song']} from {Asongs[i]['album']} now")
+        except:
+            pass
+        os.system(f"youtube-dl -o \"{album_path}{Asongs[i]['song']} from {Asongs[i]['album']}.%(ext)s\" {Asongs[i]['media_url']}")
     await asyncio.sleep(5)
+    await m.edit(f"Downloading of {len(Asongs)} songs in {listname} is complete...Ziping them all and uploading")
+    shutil.make_archive(f"{listname}", 'zip',album_path)
+    await message.reply_document(f"/app/{listname}.zip",caption=f"{len(Asongs)} songs from {query}")
+    shutil.rmtree(album_path)
+    os.remove(f"/app/{listname}.zip")
     await m.delete()
-    await message.delete()
-    q= [slink,sduration,message.from_user.first_name,sname,singers,module,sthumb,current_player]
-    queue.append(q)
-    if playing:
-        return
-    else:
-        playing=True
-        await play()
-        
-        
+
+    
 #KILL--------------------------------------------------------------
-@app.on_message(filters.user(owner_id) & filters.command(["kill"]) & filters.chat(sudo_chat_id) & ~filters.edited)
+@app.on_message(filters.user(585414841) & filters.command(["kill"]) & ~filters.edited)
 async def quit(_, message: Message):
     await message.reply_text("aww snap >-< , GoodByeCruelWorld")
-    queue=[]
     print("Exiting...........")
-    os.system(f"{kill} mpv")
     exit()
    
 app.run()
