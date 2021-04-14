@@ -406,11 +406,12 @@ async def playlist(_,message: Message):
     global queue
     global playing
     global m
+    list_of_admins = await getadmins(sudo_chat_id)
     if message.sender_chat:
         message.from_user = message.sender_chat
         message.from_user.first_name = message.sender_chat.username
+        list_of_admins.append(message.sender_chat.id)
     current_player = message.from_user.id
-    list_of_admins = await getadmins(sudo_chat_id)
     if message.from_user.id not in list_of_admins:
         a= await app.send_message(sudo_chat_id,text=f"Why don't you get an AdminTag? to use playlist {message.from_user.mention}...")
         await asyncio.sleep(5)
