@@ -152,15 +152,18 @@ async def callback_query_skip(_, message: Message):
     global queue
     global mm
     list_of_admins = await getadmins(sudo_chat_id)
+    list_of_admins.append(queue[0][7])
     if message.from_user.id not in list_of_admins:
-        a= await app.send_message(sudo_chat_id,text=f"Skipping songs without admin permission is Sin! \n Want a Good Ban {message.from_user.mention}?",disable_notification=True)
-        await asyncio.sleep(5)
-        await a.delete()
+        await app.answer_callback_query(message.id,
+                "Only admins or current users can skip!",
+                show_alert=True
+                )
         return
     elif len(queue)<=1:
-        m= await app.send_message(sudo_chat_id,text="Can't skip an empty queue!",disable_notification=True)
-        await asyncio.sleep(5)
-        await m.delete()
+        await app.answer_callback_query(message.id,
+                "Can't skip an empty queue!",
+                show_alert=True
+                )
         return
     await mm.delete()
     try:
@@ -206,9 +209,10 @@ async def q(_, message: Message):
 async def callback_query_queue(_, message):
     global queue
     if len(queue)<=1:
-        q= await app.send_message(sudo_chat_id,text= f"Queue is empty! \nClicked by {message.from_user.mention}",disable_notification=True)
-        await asyncio.sleep(5)
-        await q.delete()
+        await app.answer_callback_query(message.id,
+                "Queue is empty!",
+                show_alert=True
+                )
         return
     liste= listy(queue)
     if len(liste) > 4096:
@@ -230,22 +234,30 @@ async def callback_query_queue(_, message):
     
 #CLEAR QUEUE----------------------------------------------------------------------------------------------------------------------
 
-@app.on_message(filters.user(owner_id) & filters.command(["clearqueue"]) & filters.chat(sudo_chat_id) & ~filters.edited)
+@app.on_message(filters.command(["clearqueue"]) & filters.chat(sudo_chat_id) & ~filters.edited)
 async def q(_, message: Message):
-       global queue
-       global playing
-       global mm
-       queue=[]
-       q= await message.reply_text("Queue cleared successfully",disable_notification=True)
-       await asyncio.sleep(3)
-       await q.delete()
-       await mm.delete()
-       try:
+    global queue
+    global playing
+    global mm
+    list_of_admins = await getadmins(sudo_chat_id)
+    if message.sender_chat:
+        message.from_user = message.sender_chat
+        message.from_user.first_name = message.sender_chat.username
+        list_of_admins.append(message.sender_chat.id)
+    if message.from_user.id not in list_of_admins:
+        await message.delete()
+        return
+    queue=[]
+    q= await message.reply_text("Queue cleared successfully",disable_notification=True)
+    await asyncio.sleep(3)
+    await q.delete()
+    await mm.delete()
+    try:
         os.system(f"{kill} mpv")
-       except:
+    except:
         pass
-       playing=False
-       await message.delete()
+    playing=False
+    await message.delete()
        
 # Deezer----------------------------------------------------------------------------------------
 
@@ -260,8 +272,9 @@ async def deezer(_, message: Message):
     global queue
     global m
     query = kwairi(message)
-    if not message.from_user.id:
-        return
+    if message.sender_chat:
+        message.from_user = message.sender_chat
+        message.from_user.first_name = message.sender_chat.username
     current_player = message.from_user.id
     m = await message.reply_text(f"Searching for `{query}`on Deezer")
     try:
@@ -297,8 +310,9 @@ async def yt(_, message: Message):
     global queue
     global m
     query = kwairi(message)
-    if not message.from_user.id:
-        return
+    if message.sender_chat:
+        message.from_user = message.sender_chat
+        message.from_user.first_name = message.sender_chat.username
     current_player = message.from_user.id
     m = await message.reply_text(f"Searching for `{query}`on YouTube")
     try:
@@ -344,8 +358,9 @@ async def jiosaavn(_, message: Message):
     global queue
     global m
     query = kwairi(message)
-    if not message.from_user.id:
-        return
+    if message.sender_chat:
+        message.from_user = message.sender_chat
+        message.from_user.first_name = message.sender_chat.username
     current_player = message.from_user.id
     m = await message.reply_text(f"Searching for `{query}`on JioSaavn")
     try:
@@ -367,6 +382,7 @@ async def jiosaavn(_, message: Message):
         await m.edit("Aww...got some error! Try Again")
         await asyncio.sleep(5)
         await m.delete()
+        await message.delete()
         return
     await m.delete()
     await message.delete()
@@ -390,8 +406,9 @@ async def playlist(_,message: Message):
     global queue
     global playing
     global m
-    if not message.from_user.id:
-        return
+    if message.sender_chat:
+        message.from_user = message.sender_chat
+        message.from_user.first_name = message.sender_chat.username
     current_player = message.from_user.id
     list_of_admins = await getadmins(sudo_chat_id)
     if message.from_user.id not in list_of_admins:
@@ -446,8 +463,9 @@ async def telegram(_, message: Message):
     global playing
     global m
     query = kwairi(message)
-    if not message.from_user.id:
-        return
+    if message.sender_chat:
+        message.from_user = message.sender_chat
+        message.from_user.first_name = message.sender_chat.username
     elif not message.reply_to_message.media:
         await message.reply_text("Reply To A Telegram Audio To Play It.")
         return
@@ -486,10 +504,13 @@ async def telegram(_, message: Message):
 #KILL--------------------------------------------------------------
 @app.on_message(filters.user(owner_id) & filters.command(["kill"]) & filters.chat(sudo_chat_id) & ~filters.edited)
 async def quit(_, message: Message):
+    if message.sender_chat:
+        message.from_user = message.sender_chat
+        message.from_user.first_name = message.sender_chat.username
     await message.reply_text("aww snap >-< , GoodByeCruelWorld")
     queue=[]
     print("Exiting...........")
     os.system(f"{kill} mpv")
     exit()
-   
+
 app.run()
