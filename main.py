@@ -198,12 +198,12 @@ async def q(_, message: Message):
         os.remove(filename)
         await asyncio.sleep(10)
         await q.delete()
-        await message.delete
+        await message.delete()
     else:
         q= await message.reply_text(liste)
         await asyncio.sleep(10)
         await q.delete()
-        await message.delete
+        await message.delete()
     
 @app.on_callback_query(filters.regex("queue_"))
 async def callback_query_queue(_, message):
