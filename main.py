@@ -95,11 +95,11 @@ async def play():
     global mm
     global s
     while len(queue)>0:
-        mm = await app.send_photo(sudo_chat_id,photo=f"{queue[0][6]}",
+        mm = await app.send_photo(sudo_chat_id,photo=queue[0][6],
             caption=f"Now Playing `{queue[0][3]}`  by `{queue[0][4]}` Via {queue[0][5]}\nRequested by {queue[0][2]}",
             reply_markup=InlineKeyboardMarkup( [[ 
-            InlineKeyboardButton(f"Skip", callback_data="skip_"), 
-            InlineKeyboardButton(f"Queue", callback_data="queue_")
+            InlineKeyboardButton("Skip", callback_data="skip_"), 
+            InlineKeyboardButton("Queue", callback_data="queue_")
             ]] ),disable_notification=True)
         if queue[0][5]=="Telegram":
             await app.download_media(queue[0][0], file_name="audio.webm")
@@ -278,8 +278,10 @@ async def deezer(_, message: Message):
     current_player = message.from_user.id
     m = await message.reply_text(f"Searching for `{query}`on Deezer")
     try:
-        resp= requests.get(f"http://35.240.133.234:8000/deezer?query={query}&count=1").text
-        r = json.loads(resp)
+        resp= requests.get(f"https://thearq.tech/deezer?query={query}&count=1", 
+            headers={"X-API-KEY":"MJFWRM-SUQRGV-SOOKNT-GFMHGQ-ARQ"}).text
+        rr = json.loads(resp)
+        r = rr['result']
         sname = r[0]["title"]
         sduration = (r[0]["duration"])
         thumbnail = r[0]["thumbnail"]
@@ -365,10 +367,12 @@ async def jiosaavn(_, message: Message):
     m = await message.reply_text(f"Searching for `{query}`on JioSaavn")
     try:
         try:
-           resp= requests.get(f"https://jiosaavnapi.bhadoo.uk/result/?query={query}").text
-           r = json.loads(resp)
+           resp= requests.get(f"https://thearq.tech/saavn?query={query}", 
+            headers={"X-API-KEY":"MJFWRM-SUQRGV-SOOKNT-GFMHGQ-ARQ"}).text
+           rr = json.loads(resp)
+           r = rr['result']
         except:
-            resp= requests.get(f"http://35.240.133.234:8000/saavn?{query}=blah&count=1").text
+            resp= requests.get(f"https://jiosaavnapi.bhadoo.uk/result/?query={query}").text
             r = json.loads(resp)
         sname = r[0]['song']
         slink = r[0]['media_url']
@@ -421,8 +425,9 @@ async def playlist(_,message: Message):
     query = kwairi(message)
     m = await message.reply_text("Searching for Playlist and trying to get songs....")
     try:
-        resp= requests.get(f"http://35.240.133.234:8000/splaylist?query={query}").json()
-        for i in resp:
+        resp= requests.get(f"https://thearq.tech/splaylist?query={query}",
+            headers={"X-API-KEY":"MJFWRM-SUQRGV-SOOKNT-GFMHGQ-ARQ"}).json()
+        for i in resp['result']:
             try:
                 sname = i['song']
                 slink = i['media_url']
@@ -434,7 +439,7 @@ async def playlist(_,message: Message):
                 queue.append(q)
             except:
                 continue
-        await m.edit(f"Added {len(resp)} songs from Playlist link")
+        await m.edit(f"Added {len(resp['result'])} songs from Playlist link")
         await asyncio.sleep(5)
         await m.delete()
     except Exception as e:
