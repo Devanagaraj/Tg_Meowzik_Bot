@@ -49,22 +49,21 @@ play music.
 
 #Tutorial video 
 > Watch The Video Tutorial if you still can't do this 
-[How to deploy the Telegram Voice Chat Bot on VPS using Ubuntu/Debian](https://youtu.be/DozNTe_cydw)
+[Youtube - How to deploy the Telegram Voice Chat Bot on VPS using Ubuntu/Debian](https://youtu.be/DozNTe_cydw)
 [Thanks to t.me/ri5h46h]
 
 ## Commands
 Command | Description
 :--- | :---
-/start | To Start The bot.
 /help | To Show This Message.
-/saavn <song_name> | To Play A Song From Jiosaavn.
-/youtube <song_name> or <song_link> | To Search For A Song And Play The Top-Most Song Or Play With A Link.
+/saavn <song_name> | To search and Play A Song From Jiosaavn.
+/playlist | Saavn_playlist_link or Playlist Name" To Search and Add all songs to Queue and Play.
+/youtube <song_name> | To Search For A Song And Play The Top-Most Song Or Play With A Link.
 /telegram | To Play A Song Directly From Telegram File.
 /deezer | To Play A Song From Deezer.
 /queue | To See Queue List.
 /skip | To Skip Any Playing Music.
 Admin Commands:
-/kill | Yeah it kills the bot LOL.
 /clearqueue | It clears entire Queue in a snap.
 
 ## Note

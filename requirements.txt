@@ -1,4 +1,4 @@
 Pyrogram
 TgCrypto
-requests
-youtube_search
+python-arq
+aiohttp
