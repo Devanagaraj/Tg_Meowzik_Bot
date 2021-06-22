@@ -457,7 +457,7 @@ async def playlist(_,message: Message):
         await message.delete()
         return
     if ("https://" or "www") in query:
-        playing,queue= await playlist_play(resp['result'],m,queue)
+        queue = await playlist_play(resp['result'],m,queue)
         if playing:
             return
         else:
@@ -524,7 +524,6 @@ async def telegram(_, message: Message):
     global queue
     global playing
     global m
-    query = message.text.split(None, 1)[1]
     if message.sender_chat:
         message.from_user = message.sender_chat
         message.from_user.first_name = message.sender_chat.username
@@ -568,12 +567,12 @@ async def telegram(_, message: Message):
 async def callback_query_Cancel(_, query):
     m = query.message
     admins = await getadmins(sudo_chat_id)
-    if query.from_user.id in admins or  message.sender_chat or query.from_user.id == m.reply_to_message.from_user.id:
+    if query.from_user.id in admins or query.from_user.id == m.reply_to_message.from_user.id:
         await m.reply_to_message.delete()
         await m.delete()
         return
     else:
-        await app.answer_callback_query(message.id,
+        await app.answer_callback_query(query.id,
                 "Not for you!",
                 show_alert=True
                 )
