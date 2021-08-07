@@ -11,8 +11,7 @@
 3. Mac.
 
 # Working
-![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/thehamkercat/Telegram_VC_Bot/tree/master)
-
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/thehamkercat/Telegram_VC_Bot/tree/master)
 
 Python receives bot commands using pyrogram client which processes to play via mpv player.
 Using pulseaudio we can route our audio to telegram desktop.
