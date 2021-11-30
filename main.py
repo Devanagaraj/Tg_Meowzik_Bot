@@ -17,7 +17,7 @@ app = Client(
 
 # ARQ API and Bot Initialize---------------------------------------------------
 session = ClientSession()
-arq = ARQ("https://thearq.tech",ARQ_API_KEY,session)
+arq = ARQ("https://grambuilders.tech",ARQ_API_KEY,session)
 
 queue=[]
 db={}
